@@ -23,10 +23,28 @@
   </style>
 </head>
 <body>
-  <div class="max-w-6xl mx-auto px-5 sm:px-8 py-7 sm:py-10">
+  <section id="loginScreen" class="min-h-screen grid place-items-center px-5 py-10" aria-labelledby="loginHeading">
+    <div class="card w-full max-w-md">
+      <span class="bg-[#176b50] text-white w-12 h-12 grid place-items-center rounded-2xl text-2xl mb-6" aria-hidden="true">ব</span>
+      <p class="text-xs font-bold tracking-widest text-[#176b50] mb-3">BENGALI VOICE STUDIO</p>
+      <h1 id="loginHeading" class="text-2xl font-semibold">স্বাগতম · Sign in</h1>
+      <p class="text-sm text-slate-500 mt-2 mb-6">আপনার ID এবং password দিয়ে অ্যাপ খুলুন।</p>
+      <form id="loginForm">
+        <label for="loginId" class="block text-sm font-semibold mb-2">User ID</label>
+        <input id="loginId" name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required class="w-full rounded-xl border border-[#d5dfd8] px-4 py-3 mb-4">
+        <label for="loginPassword" class="block text-sm font-semibold mb-2">Password</label>
+        <input id="loginPassword" name="password" type="password" autocomplete="current-password" required class="w-full rounded-xl border border-[#d5dfd8] px-4 py-3">
+        <p id="loginError" hidden role="alert" class="text-sm text-red-700 mt-3">ID অথবা password ভুল হয়েছে। আবার চেষ্টা করুন।</p>
+        <button class="btn primary w-full mt-5" type="submit">Sign in →</button>
+      </form>
+      <p class="text-xs text-slate-400 leading-relaxed mt-5">Personal screen lock. This static-site login can be bypassed and does not provide server-side access protection.</p>
+    </div>
+  </section>
+  <noscript><p style="padding:24px">এই অ্যাপ ব্যবহারের জন্য JavaScript চালু করুন। Enable JavaScript to use this application.</p></noscript>
+  <div id="appScreen" hidden class="max-w-6xl mx-auto px-5 sm:px-8 py-7 sm:py-10">
     <header class="flex items-center justify-between gap-4 border-b border-[#dce4dc] pb-6">
       <a href="#" class="flex items-center gap-3 no-underline text-inherit" aria-label="বাক্ home"><span class="bg-[#176b50] text-white w-11 h-11 grid place-items-center rounded-2xl text-2xl" aria-hidden="true">ব</span><span class="text-2xl font-bold tracking-tight">বাক্<span class="text-xs font-normal text-slate-500 block tracking-normal">BENGALI VOICE STUDIO</span></span></a>
-      <span class="text-xs sm:text-sm text-[#497460] bg-[#e8eee5] rounded-full px-3 py-2">Powered by Whisper</span>
+      <div class="flex items-center gap-2"><span class="hidden sm:inline text-xs sm:text-sm text-[#497460] bg-[#e8eee5] rounded-full px-3 py-2">Powered by Whisper</span><button id="logout" type="button" class="btn">Log out</button></div>
     </header>
     <main>
       <section class="pt-10 pb-8 sm:pt-14">
@@ -42,7 +60,7 @@
           <div class="relative flex-1 min-w-[190px]"><input id="apiKey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" aria-describedby="keyHelp" placeholder="Paste your OpenAI API key" class="w-full rounded-xl border border-[#d5dfd8] bg-[#fafbf9] px-4 py-3 pr-20 text-sm"><button id="toggleKey" class="absolute right-3 top-3 text-sm text-[#176b50] font-semibold" type="button" aria-pressed="false">Show</button></div>
           <button id="saveKey" class="btn primary" type="button">Save Key</button><button id="forgetKey" class="btn" type="button">Forget</button>
         </div>
-        <p id="keyHelp" class="text-xs text-slate-500 mt-3 leading-relaxed">Personal use only: saved keys are unencrypted in this browser’s localStorage and accessible to scripts on this origin, including the Tailwind CDN. Use a trusted device. Never put a key in your HTML or GitHub repository. Audio is sent directly to OpenAI when you transcribe.</p>
+        <p id="keyHelp" class="text-xs text-slate-500 mt-3 leading-relaxed">Save Key চাপলে এই ব্রাউজারে key থাকবে; Log out করলেও saved key থাকবে। মুছতে Forget চাপুন। Saved keys are unencrypted in localStorage and accessible to scripts on this origin, including the Tailwind CDN. Use a trusted device. Never put a key in your HTML or GitHub repository. Audio is sent directly to OpenAI when you transcribe.</p>
       </section>
       <div class="grid lg:grid-cols-2 gap-6 items-start">
         <section class="card" aria-labelledby="audioHeading">
@@ -86,11 +104,35 @@
   const $ = id => document.getElementById(id);
   const MAX_BYTES = 100000000, API_MAX_BYTES = 24000000, KEY_NAME = 'bak.openai.key.v1';
   const state = {mode:'upload', upload:null, recording:null, url:null, busy:false, acquiring:false, stopping:false, recorder:null, stream:null, interval:null, started:0, duration:0, segments:[], original:'', controller:null};
+  // Convenience screen lock only: client-side code and credentials are public.
+  const LOGIN_SESSION='bak.screen-unlocked.v1';
+  let unlocked=false;
+  function showSession(){
+    $('loginScreen').hidden=unlocked;$('appScreen').hidden=!unlocked;
+    $('apiKey').type='password';$('toggleKey').textContent='Show';$('toggleKey').setAttribute('aria-pressed','false');
+    sync();
+  }
+  $('loginForm').onsubmit=event=>{
+    event.preventDefault();
+    if($('loginId').value.trim()!=='aa' || $('loginPassword').value!=='1111'){
+      $('loginError').hidden=false;$('loginPassword').value='';$('loginPassword').focus();return;
+    }
+    unlocked=true;$('loginError').hidden=true;$('loginPassword').value='';
+    try{sessionStorage.setItem(LOGIN_SESSION,'yes');}catch{}
+    showSession();$('apiKey').focus();
+  };
+  $('logout').onclick=()=>{
+    if(state.busy || recordingActive())return;
+    unlocked=false;try{sessionStorage.removeItem(LOGIN_SESSION);}catch{}
+    $('preview').pause();$('loginId').value='';$('loginPassword').value='';$('loginError').hidden=true;
+    showSession();$('loginId').focus();
+  };
   function notify(message, tone='success') { $('notice').textContent=message; $('notice').dataset.tone=tone; $('notice').hidden=false; $('notice').setAttribute('role',tone==='error'?'alert':'status'); }
   function selectedFile() { return state.mode==='upload'?state.upload:state.recording; }
   function recordingActive() { return Boolean(state.acquiring || state.stopping || (state.recorder && state.recorder.state!=='inactive')); }
   function sync() {
-    const locked=state.busy || recordingActive();
+    const locked=!unlocked || state.busy || recordingActive();
+    $('logout').disabled=state.busy || recordingActive();
     for(const id of ['uploadTab','recordTab','dropzone','fileInput']) $(id).disabled=locked;
     $('startRecording').disabled=locked || !window.MediaRecorder || !navigator.mediaDevices?.getUserMedia;
     $('stopRecording').disabled=!state.recorder || state.recorder.state!=='recording' || state.stopping;
@@ -137,7 +179,7 @@
   function stopRecording(){if(state.recorder?.state==='recording'){state.stopping=true;state.recorder.stop();releaseMic();$('recordStatus').textContent='Preparing audio…';sync();}}
   $('stopRecording').onclick=stopRecording;
   $('startRecording').onclick=async()=>{
-    if(state.busy || recordingActive()) return;
+    if(!unlocked || state.busy || recordingActive()) return;
     if(!window.isSecureContext) return notify('Recording needs HTTPS. Open your GitHub Pages HTTPS URL or localhost.','error');
     if(!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) return notify('Recording is unavailable in this browser. Please upload an audio file.','error');
     state.acquiring=true;sync();$('recordStatus').textContent='Waiting for microphone permission…';
@@ -205,7 +247,7 @@
   }
   function validSegments(data){return Array.isArray(data.segments)?data.segments.filter(s=>Number.isFinite(s.start)&&Number.isFinite(s.end)&&s.start>=0&&s.end>s.start&&typeof s.text==='string'):[];}
   $('transcribe').onclick=async()=>{
-    if(state.busy || recordingActive())return;
+    if(!unlocked || state.busy || recordingActive())return;
     const key=$('apiKey').value.trim(),file=selectedFile();
     if(!key){$('apiKey').focus();return notify('API key প্রয়োজন — paste your OpenAI API key first.','error');}
     if(!file)return notify('অডিও দিন — upload a file or record your voice first.','error');
@@ -285,7 +327,8 @@
   $('downloadSrt').onclick=()=>{download(makeSrt(),'srt','application/x-subrip');if($('transcript').value.trim()!==state.original.trim() || !state.segments.length)notify('SRT downloaded with estimated timestamps. Review subtitle timing before publishing.');};
   window.addEventListener('pagehide',()=>{state.controller?.abort();if(state.recorder?.state==='recording')state.recorder.stop();releaseMic();if(state.url)URL.revokeObjectURL(state.url);});
   if(!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia)$('recordStatus').textContent='Recording unavailable here. Use HTTPS and a supported browser, or upload a file.';
-  updateCounts();
+  try{unlocked=sessionStorage.getItem(LOGIN_SESSION)==='yes';}catch{}
+  showSession();updateCounts();
   </script>
 </body>
 </html>
