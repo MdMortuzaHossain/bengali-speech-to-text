@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Turn Bengali audio into editable text with OpenAI Whisper. Upload, record, and export transcripts and subtitles.">
+  <title>বাক্ — Bengali Speech to Text</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root{font-family:Inter,"Noto Sans Bengali","Nirmala UI",system-ui,sans-serif;color:#172c28;background:#f4f6f2}
+    body{margin:0}button,input,textarea{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;opacity:.45}
+    .card{background:#fff;border:1px solid #dfe6df;border-radius:24px;padding:28px;box-shadow:0 8px 30px #203c2905}
+    .btn{border:1px solid #d5dfd8;border-radius:12px;padding:11px 17px;background:white;font-weight:600;font-size:14px;transition:background .15s,transform .15s}
+    .btn:hover:not(:disabled){background:#edf3ed;transform:translateY(-1px)}.primary{background:#176b50;color:white;border-color:#176b50}.primary:hover:not(:disabled){background:#10543e}
+    :focus-visible{outline:3px solid #65b398;outline-offset:3px}input,textarea{outline-color:#176b50}
+    [hidden]{display:none!important}.active-tab{background:white!important;color:#176b50!important;box-shadow:0 2px 8px #18352712}
+    #dropzone.dragover{border-color:#176b50;background:#e7f4ec}.spinner{display:inline-block;width:17px;height:17px;border:2px solid #ffffff55;border-top-color:white;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:8px}
+    @keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+    #notice[data-tone="error"]{background:#fff0ed;color:#9f2f20;border-color:#f4c6bc}#notice[data-tone="success"]{background:#e8f6ed;color:#185e3b}
+    @media(max-width:640px){.card{padding:20px;border-radius:18px}}
+  </style>
+</head>
+<body>
+  <div class="max-w-6xl mx-auto px-5 sm:px-8 py-7 sm:py-10">
+    <header class="flex items-center justify-between gap-4 border-b border-[#dce4dc] pb-6">
+      <a href="#" class="flex items-center gap-3 no-underline text-inherit" aria-label="বাক্ home"><span class="bg-[#176b50] text-white w-11 h-11 grid place-items-center rounded-2xl text-2xl" aria-hidden="true">ব</span><span class="text-2xl font-bold tracking-tight">বাক্<span class="text-xs font-normal text-slate-500 block tracking-normal">BENGALI VOICE STUDIO</span></span></a>
+      <span class="text-xs sm:text-sm text-[#497460] bg-[#e8eee5] rounded-full px-3 py-2">Powered by Whisper</span>
+    </header>
+    <main>
+      <section class="pt-10 pb-8 sm:pt-14">
+        <p class="text-xs font-bold tracking-[.2em] text-[#176b50] mb-4">YOUR VOICE. YOUR WORDS.</p>
+        <h1 class="text-3xl sm:text-5xl font-semibold leading-tight tracking-tight">আপনার কথা, লিখিত হোক।</h1>
+        <p class="text-slate-500 mt-4 max-w-xl leading-relaxed">Turn Bengali speech into beautiful, editable text. Upload an audio file or record your voice to get started.</p>
+      </section>
+      <div id="notice" hidden role="status" aria-live="polite" aria-atomic="true" class="border rounded-xl px-4 py-3 mb-6 text-sm break-words"></div>
+      <section class="card mb-6" aria-labelledby="keyHeading">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-4"><h2 id="keyHeading" class="font-semibold">01 <span class="ml-2">Connect your API key</span></h2><span id="keyStatus" class="text-xs text-slate-500">Stored only when you choose Save Key</span></div>
+        <label for="apiKey" class="sr-only">OpenAI API key</label>
+        <div class="flex flex-wrap sm:flex-nowrap gap-2">
+          <div class="relative flex-1 min-w-[190px]"><input id="apiKey" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" aria-describedby="keyHelp" placeholder="Paste your OpenAI API key" class="w-full rounded-xl border border-[#d5dfd8] bg-[#fafbf9] px-4 py-3 pr-20 text-sm"><button id="toggleKey" class="absolute right-3 top-3 text-sm text-[#176b50] font-semibold" type="button" aria-pressed="false">Show</button></div>
+          <button id="saveKey" class="btn primary" type="button">Save Key</button><button id="forgetKey" class="btn" type="button">Forget</button>
+        </div>
+        <p id="keyHelp" class="text-xs text-slate-500 mt-3 leading-relaxed">Personal use only: saved keys are unencrypted in this browser’s localStorage and accessible to scripts on this origin, including the Tailwind CDN. Use a trusted device. Never put a key in your HTML or GitHub repository. Audio is sent directly to OpenAI when you transcribe.</p>
+      </section>
+      <div class="grid lg:grid-cols-2 gap-6 items-start">
+        <section class="card" aria-labelledby="audioHeading">
+          <h2 id="audioHeading" class="font-semibold mb-5">02 <span class="ml-2">Add your audio</span></h2>
+          <div role="tablist" aria-label="Audio source" class="flex p-1 bg-[#f0f3ef] rounded-xl mb-5">
+            <button id="uploadTab" role="tab" aria-selected="true" aria-controls="uploadPanel" class="active-tab flex-1 py-2.5 rounded-lg text-sm font-semibold">Upload file</button>
+            <button id="recordTab" role="tab" aria-selected="false" aria-controls="recordPanel" tabindex="-1" class="flex-1 py-2.5 rounded-lg text-sm font-semibold text-slate-500">Record voice</button>
+          </div>
+          <div id="uploadPanel" role="tabpanel" aria-labelledby="uploadTab">
+            <input id="fileInput" type="file" accept=".mp3,.wav,.m4a,.webm,.mp4,.mpeg,.mpga,.ogg,.flac" class="sr-only">
+            <button id="dropzone" type="button" class="w-full border-2 border-dashed border-[#cad9ce] rounded-2xl bg-[#f9fbf7] px-5 py-10 text-center">
+              <span class="mx-auto mb-4 bg-[#e8f0e7] text-[#176b50] w-12 h-12 rounded-2xl grid place-items-center text-2xl" aria-hidden="true">↑</span>
+              <span class="font-semibold block">Drop your audio here</span><span class="text-sm text-slate-500 block mt-2">or <span class="text-[#176b50] underline underline-offset-4">browse files</span></span><span class="text-xs text-slate-400 block mt-5">MP3, WAV, M4A, WEBM & more · up to 25 MB</span>
+            </button>
+          </div>
+          <div id="recordPanel" role="tabpanel" aria-labelledby="recordTab" hidden class="border border-[#dfe6df] rounded-2xl bg-[#f9fbf7] text-center px-4 py-8">
+            <p class="text-3xl text-[#176b50] mb-3" aria-hidden="true">◉</p><p id="recordStatus" class="text-sm text-slate-500 mb-4" role="status">Ready when you are · মাইক্রোফোনে কথা বলুন</p>
+            <p id="timer" class="text-2xl font-mono mb-5" aria-label="Recording duration">00:00</p>
+            <div class="flex justify-center flex-wrap gap-2"><button id="startRecording" class="btn primary">Start Recording</button><button id="stopRecording" class="btn" disabled>Stop Recording</button></div>
+            <p class="text-xs text-slate-400 mt-4">Microphone permission required · HTTPS or localhost</p>
+          </div>
+          <div id="audioDetails" hidden class="mt-4 rounded-xl border border-[#dfe6df] p-4"><p id="fileName" class="text-sm font-semibold break-all"></p><p id="fileSize" class="text-xs text-slate-500 mt-1"></p><audio id="preview" controls preload="metadata" class="w-full mt-3" aria-label="Audio preview"></audio><p class="text-xs text-slate-400 mt-2">Some formats may transcribe even if your browser cannot preview them.</p></div>
+          <button id="transcribe" class="btn primary w-full mt-5 py-3.5">Transcribe Audio <span class="ml-2" aria-hidden="true">→</span></button>
+          <button id="cancel" hidden class="btn w-full mt-2">Cancel request</button>
+          <p class="text-xs text-center text-slate-400 mt-3">Automatic language detection · whisper-1</p>
+        </section>
+        <section class="card" aria-labelledby="transcriptHeading">
+          <div class="flex items-center justify-between gap-2 mb-5"><h2 id="transcriptHeading" class="font-semibold">03 <span class="ml-2">Your transcript</span></h2><span class="text-xs text-[#176b50] bg-[#edf4e9] rounded-full px-3 py-1">Editable</span></div>
+          <label for="transcript" class="sr-only">Editable Bengali transcript</label><textarea id="transcript" lang="bn" dir="auto" placeholder="আপনার অডিওর লেখা এখানে দেখা যাবে…" class="w-full min-h-[310px] resize-y rounded-2xl border border-[#dfe6df] bg-[#fafbf9] p-5 text-lg leading-8"></textarea>
+          <div class="flex justify-between gap-2 text-xs text-slate-500 mt-3"><span><span id="wordCount">0</span> words · <span id="charCount">0</span> characters</span><span>UTF-8 Bengali</span></div>
+          <div class="flex flex-wrap gap-2 mt-5"><button id="copy" class="btn" disabled>Copy Text</button><button id="downloadTxt" class="btn" disabled>Download .txt</button><button id="downloadSrt" class="btn" disabled>Download .srt</button></div>
+          <p id="subtitleHint" class="text-xs text-slate-400 leading-relaxed mt-4">Subtitle exports use Whisper timestamps. Edited text uses estimated timing.</p>
+        </section>
+      </div>
+      <aside class="flex gap-3 text-sm text-slate-500 my-7 px-2 leading-relaxed"><span class="text-[#176b50]" aria-hidden="true">✦</span><p>For the best results, use clear audio with minimal background noise. You can review and edit every word before exporting.</p></aside>
+    </main>
+    <footer class="border-t border-[#dce4dc] pt-6 mt-8 text-xs text-slate-400 flex flex-wrap justify-between gap-3"><span>বাক্ · Made for the way you speak.</span><span>Browser-based · No build step · GitHub Pages ready</span></footer>
+  </div>
+  <script>
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const MAX_BYTES = 25000000, KEY_NAME = 'bak.openai.key.v1';
+  const state = {mode:'upload', upload:null, recording:null, url:null, busy:false, acquiring:false, stopping:false, recorder:null, stream:null, interval:null, started:0, duration:0, segments:[], original:'', controller:null};
+  function notify(message, tone='success') { $('notice').textContent=message; $('notice').dataset.tone=tone; $('notice').hidden=false; $('notice').setAttribute('role',tone==='error'?'alert':'status'); }
+  function selectedFile() { return state.mode==='upload'?state.upload:state.recording; }
+  function recordingActive() { return Boolean(state.acquiring || state.stopping || (state.recorder && state.recorder.state!=='inactive')); }
+  function sync() {
+    const locked=state.busy || recordingActive();
+    for(const id of ['uploadTab','recordTab','dropzone','fileInput']) $(id).disabled=locked;
+    $('startRecording').disabled=locked || !window.MediaRecorder || !navigator.mediaDevices?.getUserMedia;
+    $('stopRecording').disabled=!state.recorder || state.recorder.state!=='recording' || state.stopping;
+    $('transcribe').disabled=locked; $('cancel').hidden=!state.busy;
+    $('transcript').readOnly=state.busy;
+    const empty=!$('transcript').value.trim();
+    for(const id of ['copy','downloadTxt','downloadSrt']) $(id).disabled=empty;
+  }
+  function showAudio() {
+    $('preview').pause(); $('preview').removeAttribute('src'); $('preview').load();
+    if(state.url) URL.revokeObjectURL(state.url);
+    state.url=null; const file=selectedFile(); $('audioDetails').hidden=!file;
+    if(!file) return;
+    $('fileName').textContent=file.name; $('fileSize').textContent=(file.size/1000000).toFixed(2)+' MB · '+(state.mode==='upload'?'Uploaded audio':'Recorded audio');
+    state.url=URL.createObjectURL(file); $('preview').src=state.url;
+  }
+  function switchMode(mode, focus=false) {
+    if(state.busy || recordingActive()) return;
+    state.mode=mode;
+    for(const name of ['upload','record']) { const active=name===mode; $(name+'Tab').setAttribute('aria-selected',String(active)); $(name+'Tab').tabIndex=active?0:-1; $(name+'Tab').classList.toggle('active-tab',active); $(name+'Panel').hidden=!active; }
+    if(focus) $(mode+'Tab').focus(); showAudio(); sync();
+  }
+  for(const mode of ['upload','record']) { $(mode+'Tab').onclick=()=>switchMode(mode); $(mode+'Tab').onkeydown=e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){e.preventDefault();switchMode(e.key==='Home'?'upload':e.key==='End'?'record':state.mode==='upload'?'record':'upload',true);}}; }
+  $('toggleKey').onclick=()=>{ const visible=$('apiKey').type==='password'; $('apiKey').type=visible?'text':'password'; $('toggleKey').textContent=visible?'Hide':'Show'; $('toggleKey').setAttribute('aria-pressed',String(visible)); };
+  $('saveKey').onclick=()=>{ const key=$('apiKey').value.trim(); if(!key) return notify('প্রথমে API key দিন — enter your OpenAI API key.','error'); try{localStorage.setItem(KEY_NAME,key);$('keyStatus').textContent='Key saved in this browser';notify('API key saved locally. এই ব্রাউজারে সংরক্ষিত হয়েছে।');}catch{notify('Storage unavailable. You can still use the key for this session.','error');} };
+  $('forgetKey').onclick=()=>{ $('apiKey').value='';try{localStorage.removeItem(KEY_NAME);$('keyStatus').textContent='No saved key';notify('Saved API key removed.');}catch{notify('Could not remove stored key. Clear this site’s data in browser settings.','error');} };
+  $('apiKey').oninput=()=>{$('keyStatus').textContent='Current field used for the next request';};
+  try{ $('apiKey').value=localStorage.getItem(KEY_NAME)||''; if($('apiKey').value) $('keyStatus').textContent='Saved key loaded'; }catch{ $('keyStatus').textContent='Browser storage unavailable'; }
+  function acceptFile(file) {
+    if(state.busy || recordingActive()) return;
+    if(!file) return;
+    if(!/\.(mp3|wav|m4a|webm|mp4|mpeg|mpga|ogg|flac)$/i.test(file.name)) return notify('অসমর্থিত ফাইল — choose MP3, WAV, M4A, WEBM, MP4, MPEG, MPGA, OGG or FLAC.','error');
+    if(!file.size) return notify('The audio file is empty. অন্য ফাইল দিন।','error');
+    if(file.size>MAX_BYTES) return notify('ফাইলটি বড় — maximum audio size is 25 MB. Compress or split the audio first.','error');
+    state.upload=file;showAudio();sync();notify('Audio ready. Click Transcribe Audio to send it to OpenAI.');
+  }
+  $('dropzone').onclick=()=>$('fileInput').click();
+  $('fileInput').onchange=e=>{acceptFile(e.target.files[0]);e.target.value='';};
+  for(const event of ['dragenter','dragover']) $('dropzone').addEventListener(event,e=>{e.preventDefault();if(!state.busy)$('dropzone').classList.add('dragover');});
+  for(const event of ['dragleave','drop']) $('dropzone').addEventListener(event,e=>{e.preventDefault();$('dropzone').classList.remove('dragover');});
+  $('dropzone').addEventListener('drop',e=>{if(e.dataTransfer.files.length!==1)return notify('Please drop one audio file at a time.','error');acceptFile(e.dataTransfer.files[0]);});
+  window.addEventListener('dragover',e=>e.preventDefault());window.addEventListener('drop',e=>e.preventDefault());
+  function releaseMic(){clearInterval(state.interval);state.interval=null;state.stream?.getTracks().forEach(track=>track.stop());state.stream=null;}
+  function stopRecording(){if(state.recorder?.state==='recording'){state.stopping=true;state.recorder.stop();releaseMic();$('recordStatus').textContent='Preparing audio…';sync();}}
+  $('stopRecording').onclick=stopRecording;
+  $('startRecording').onclick=async()=>{
+    if(state.busy || recordingActive()) return;
+    if(!window.isSecureContext) return notify('Recording needs HTTPS. Open your GitHub Pages HTTPS URL or localhost.','error');
+    if(!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia) return notify('Recording is unavailable in this browser. Please upload an audio file.','error');
+    state.acquiring=true;sync();$('recordStatus').textContent='Waiting for microphone permission…';
+    try{
+      state.stream=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mime=['audio/webm;codecs=opus','audio/mp4','audio/webm','audio/ogg;codecs=opus'].find(type=>MediaRecorder.isTypeSupported(type));
+      if(!mime) throw new Error('No supported recording format. Please upload audio instead.');
+      const recorder=new MediaRecorder(state.stream,{mimeType:mime});state.recorder=recorder;
+      let chunks=[],bytes=0,failed=false;
+      recorder.ondataavailable=e=>{if(e.data.size){chunks.push(e.data);bytes+=e.data.size;if(bytes>=MAX_BYTES && recorder.state==='recording'){notify('Recording reached the size limit and was stopped.','error');stopRecording();}}};
+      recorder.onerror=()=>{failed=true;notify('Recording failed. Please try again or upload audio.','error');if(recorder.state==='recording')stopRecording();else{releaseMic();state.recorder=null;state.stopping=false;sync();}};
+      recorder.onstop=()=>{
+        state.duration=(Date.now()-state.started)/1000;releaseMic();state.stopping=false;state.recorder=null;
+        const blob=new Blob(chunks,{type:recorder.mimeType});chunks=[];
+        if(!failed && blob.size>0 && blob.size<=MAX_BYTES){const ext=mime.includes('mp4')?'m4a':mime.includes('ogg')?'ogg':'webm';state.recording=new File([blob],'recording-'+Date.now()+'.'+ext,{type:blob.type});showAudio();$('recordStatus').textContent='Recording ready · অডিও প্রস্তুত';}
+        else { $('recordStatus').textContent='Recording could not be saved';if(!failed)notify('Recording was empty or exceeded 25 MB. Please make a shorter recording.','error'); }
+        sync();
+      };
+      recorder.start(1000);state.started=Date.now();$('timer').textContent='00:00';$('recordStatus').textContent='● Recording… কথা বলুন';
+      state.interval=setInterval(()=>{const seconds=Math.floor((Date.now()-state.started)/1000);$('timer').textContent=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');},500);
+    }catch(error){releaseMic();state.recorder=null;$('recordStatus').textContent='Microphone unavailable';notify(error.name==='NotAllowedError'?'মাইক্রোফোনের অনুমতি দিন — allow microphone access in browser settings.':error.name==='NotFoundError'?'No microphone found. Connect a microphone or upload audio.':error.message||'Unable to start microphone.','error');}
+    finally{state.acquiring=false;sync();}
+  };
+  function updateCounts(){const text=$('transcript').value;let words;if(typeof Intl.Segmenter==='function')words=[...new Intl.Segmenter('bn',{granularity:'word'}).segment(text)].filter(item=>item.isWordLike).length;else words=text.trim()?text.trim().split(/\s+/u).length:0;$('wordCount').textContent=words;$('charCount').textContent=Array.from(text).length;$('subtitleHint').textContent=text.trim()===state.original.trim() && state.segments.length?'SRT will use Whisper’s audio segment timestamps.':'SRT uses estimated sequential timing for edited or manually entered text. Review timing before publishing.';sync();}
+  $('transcript').oninput=updateCounts;
+  $('transcribe').onclick=async()=>{
+    if(state.busy || recordingActive())return;
+    const key=$('apiKey').value.trim(),file=selectedFile();
+    if(!key){$('apiKey').focus();return notify('API key প্রয়োজন — paste your OpenAI API key first.','error');}
+    if(!file)return notify('অডিও দিন — upload a file or record your voice first.','error');
+    if(file.size>MAX_BYTES || !file.size)return notify('Please use a non-empty audio file under 25 MB.','error');
+    state.busy=true;state.controller=new AbortController();let timedOut=false;
+    const timeout=setTimeout(()=>{timedOut=true;state.controller?.abort();},300000);
+    $('transcribe').innerHTML='<span class="spinner" aria-hidden="true"></span>Processing…';$('transcribe').setAttribute('aria-busy','true');sync();notify('ট্রান্সক্রিপশন চলছে — sending audio to OpenAI. Large files may take a few minutes.');
+    try{
+      const form=new FormData();form.append('file',file,file.name);form.append('model','whisper-1');form.append('response_format','verbose_json');form.append('timestamp_granularities[]','segment');
+      const response=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{Authorization:'Bearer '+key},body:form,signal:state.controller.signal});
+      const payload=await response.text();let data;try{data=JSON.parse(payload);}catch{throw new Error('OpenAI returned an unreadable response (HTTP '+response.status+'). Try again later.');}
+      if(!response.ok){const friendly={400:'Audio could not be processed. Check its format and contents.',401:'Invalid API key. Check or replace your key.',403:'This key does not have access to audio transcription.',413:'Audio is too large. Compress or split the file.',429:'Quota or rate limit reached. Check API billing, or wait before retrying.',500:'OpenAI is temporarily unavailable. Try again later.',503:'OpenAI is busy. Try again later.'};throw new Error((friendly[response.status]||'Transcription failed (HTTP '+response.status+').')+(data.error?.message?' '+String(data.error.message).slice(0,400):''));}
+      if(typeof data.text!=='string')throw new Error('The response did not include transcript text. Please try another audio file.');
+      state.original=data.text;state.duration=Number.isFinite(data.duration)?data.duration:0;state.segments=Array.isArray(data.segments)?data.segments.filter(s=>Number.isFinite(s.start)&&Number.isFinite(s.end)&&s.start>=0&&s.end>s.start&&typeof s.text==='string'):[];
+      $('transcript').value=data.text;updateCounts();notify(data.text.trim()?'ট্রান্সক্রিপশন সম্পন্ন — your transcript is ready to edit and export.':'No speech detected. Try a clearer audio recording.');
+    }catch(error){notify(error.name==='AbortError'?(timedOut?'Request timed out after 5 minutes. Try a shorter audio file.':'Request canceled. Your existing transcript is unchanged.'):error instanceof TypeError?'Connection failed. Check your internet connection and whether your browser can reach api.openai.com.':error.message,'error');}
+    finally{clearTimeout(timeout);state.busy=false;state.controller=null;$('transcribe').innerHTML='Transcribe Audio <span class="ml-2" aria-hidden="true">→</span>';$('transcribe').removeAttribute('aria-busy');sync();}
+  };
+  $('cancel').onclick=()=>state.controller?.abort();
+  $('copy').onclick=async()=>{try{await navigator.clipboard.writeText($('transcript').value);$('copy').textContent='Copied!';notify('Copied! লেখা কপি হয়েছে।');setTimeout(()=>$('copy').textContent='Copy Text',2000);}catch{$('transcript').focus();$('transcript').select();notify('Clipboard unavailable. Text selected — press Ctrl+C or Command+C to copy.','error');}};
+  function download(content,extension,mime){const url=URL.createObjectURL(new Blob(['\uFEFF',content],{type:mime+';charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='bengali-transcript-'+new Date().toISOString().slice(0,10)+'.'+extension;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);}
+  $('downloadTxt').onclick=()=>download($('transcript').value,'txt','text/plain');
+  function timestamp(seconds){const ms=Math.max(0,Math.round(seconds*1000));return String(Math.floor(ms/3600000)).padStart(2,'0')+':'+String(Math.floor(ms/60000)%60).padStart(2,'0')+':'+String(Math.floor(ms/1000)%60).padStart(2,'0')+','+String(ms%1000).padStart(3,'0');}
+  function makeSrt(){
+    const text=$('transcript').value.trim();if(!text)return '';
+    let segments;
+    if(text===state.original.trim() && state.segments.length)segments=state.segments.filter(s=>s.text.trim());
+    else{
+      const chunks=[];
+      for(const paragraph of text.split(/\n+/u).filter(p=>p.trim())){let line='';for(const word of paragraph.trim().split(/\s+/u)){if(line && Array.from(line+' '+word).length>70){chunks.push(line);line='';}line+=(line?' ':'')+word;}if(line)chunks.push(line);}
+      const total=chunks.reduce((sum,t)=>sum+Array.from(t).length,0);
+      const duration=state.duration>0?Math.max(state.duration,chunks.length*.001):Math.max(chunks.length*3,text.split(/\s+/u).length/2.5);
+      let cursor=0;segments=chunks.map(t=>{const start=cursor;cursor+=duration*Array.from(t).length/total;return {start,end:cursor,text:t};});
+    }
+    return segments.map((s,i)=>(i+1)+'\r\n'+timestamp(s.start)+' --> '+timestamp(Math.max(s.end,s.start+.001))+'\r\n'+s.text.trim().replace(/\r?\n\s*\r?\n/g,'\n')).join('\r\n\r\n')+'\r\n';
+  }
+  $('downloadSrt').onclick=()=>{download(makeSrt(),'srt','application/x-subrip');if($('transcript').value.trim()!==state.original.trim() || !state.segments.length)notify('SRT downloaded with estimated timestamps. Review subtitle timing before publishing.');};
+  window.addEventListener('pagehide',()=>{state.controller?.abort();if(state.recorder?.state==='recording')state.recorder.stop();releaseMic();if(state.url)URL.revokeObjectURL(state.url);});
+  if(!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia)$('recordStatus').textContent='Recording unavailable here. Use HTTPS and a supported browser, or upload a file.';
+  updateCounts();
+  </script>
+</body>
+</html>
+
